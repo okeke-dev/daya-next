@@ -36,7 +36,6 @@
     "CHANGELOG.md",
     "LICENSE"
   ],
-  "sideEffects": false,
   "engines": {
     "node": ">=18.18.0"
   },
@@ -105,6 +104,6 @@
     "test:coverage": "vitest run --coverage",
     "test:integration": "vitest run tests/integration",
     "check:exports": "publint && attw --pack",
-    "ci": "npm run typecheck && npm run lint && npm run format:check && npm run test && npm run build && npm run check:exports"
+    "ci": "npm run typecheck && npm run lint && npm run format:check && npm run build && npm run test && npm run check:exports"
   }
 }

@@ -12,10 +12,12 @@ resolution, Node.js runtime support, and no client-side bundle.
 
 ## Features
 
-- **Server-only by design** — secret-touching code is imported exclusively
-  through the `/server` entry; next to nothing ships to the client.
+- **Server-only by design** — `createDayaClient`/`getDayaClient` are guarded by
+  the `server-only` marker; importing the package from a Client Component fails
+  the Next.js build instead of shipping secret-reading code.
 - **Zero-config environment resolution** — reads `DAYA_API_KEY`,
-  `DAYA_WEBHOOK_SECRET`, `DAYA_ENVIRONMENT`, and `DAYA_BASE_URL` at call time.
+  `DAYA_WEBHOOK_SECRET`, `DAYA_ENVIRONMENT`, and `DAYA_BASE_URL` at call time,
+  with sandbox/production inferred from your API key prefix.
 - **Typed webhook Route Handlers** — one factory that verifies the
   `x-daya-signature` HMAC (using the SDK's timing-safe verification), parses the
   event, dispatches to typed handlers, and supports idempotent processing.
@@ -58,14 +60,14 @@ DAYA_WEBHOOK_SECRET=whsec_xxxx
 
 ```ts
 // lib/daya.ts
-import { getDayaClient } from "@okeke-dev/daya-next/server";
+import { getDayaClient } from "@okeke-dev/daya-next";
 
 export const getClient = getDayaClient;
 ```
 
 ```tsx
 // app/page.tsx
-import { DayaNextConfigError } from "@okeke-dev/daya-next/server";
+import { DayaNextConfigError } from "@okeke-dev/daya-next";
 import { getClient } from "@/lib/daya";
 
 export const dynamic = "force-dynamic";
@@ -84,10 +86,12 @@ export default async function Page() {
 }
 ```
 
-> **Reuse note:** `getDayaClient` creates a fresh client per call. Wrap it with
-> React [`cache()`](https://nextjs.org/docs/app/api-reference/functions/cache)
-> if you need request-scoped reuse — the package deliberately avoids importing
-> React so it can never leak into a client bundle.
+> **Reuse note:** `getDayaClient` creates a fresh client per call; the `Daya`
+> constructor does no network I/O, so this is cheap. For request-scoped reuse,
+> wrap it in React [`cache()`](https://nextjs.org/docs/app/api-reference/functions/cache)
+> — the package deliberately avoids React imports so the choice is yours, and it
+> never memoizes **module-wide** (that would share one API key across every
+> request).
 
 ### 3. Handle webhooks
 
@@ -118,21 +122,84 @@ perform async work asynchronously. For exactly-once semantics, provide
 
 ---
 
-## Manual client
+## The Daya client helper
+
+`createDayaClient` and `getDayaClient` wrap the SDK's `Daya` client — they add
+Next.js-aware configuration resolution and server-only enforcement, and delegate
+every HTTP concern (retries, error mapping, resources) to the SDK. No Daya HTTP
+behavior is re-implemented here.
 
 ```ts
-import { createDayaClient } from "@okeke-dev/daya-next/server";
+import { createDayaClient } from "@okeke-dev/daya-next";
 
-export const { POST } = createDayaWebhookRoute...;
-
-const daya = createDayaClient({
-  apiKey: process.env.DAYA_API_KEY,
-  baseUrl: "https://api.sandbox.daya.co",
-});
+const daya = createDayaClient(); // configured from the environment
+const customer = await daya.customers.get("cus_...");
 ```
 
-Values provided explicitly are used verbatim; anything omitted is resolved from
-the environment at call time.
+### Where you can (and cannot) import it
+
+| Context                        | Allowed?                                         |
+| ------------------------------ | ------------------------------------------------ |
+| Server Components              | ✅                                                |
+| Route Handlers                 | ✅ (`export const runtime = "nodejs"`)           |
+| Server Actions                 | ✅                                                |
+| Server-only library code       | ✅                                                |
+| Client Components / browser    | ❌ fails the build (see below)                    |
+
+Both `@okeke-dev/daya-next` and `@okeke-dev/daya-next/server` expose the helper.
+The package root is the primary entry; the `/server` subpath additionally
+re-exports webhook/route-handler utilities. **Neither** is safe to import from a
+client bundle.
+
+### Server-only enforcement (how it works)
+
+- Every secret-touching module starts with `import "server-only"`.
+  Next.js resolves the `server-only` package using the `react-server` export
+  condition and maps it to a no-op for server builds, but keeps the throwing
+  variant for anything that crosses into the client graph — so a Client
+  Component that imports the package fails at build time:
+  `This module cannot be imported from a Client Component module.`
+- Secrets resolve from `process.env` **at call time**, never at module scope, so
+  even module evaluation leaves nothing sensitive behind.
+- The package declares no `sideEffects: false`, ensuring the guard import can
+  never be tree-shaken away by a bundler.
+- Tests verify enforcement against the **packaged** output: a plain-Node import
+  (no `react-server` condition) throws, and one with
+  `--conditions=react-server` loads.
+
+### Configuration & precedence
+
+1. **Explicit option** — `apiKey`, `environment`, `baseUrl`, `timeout`, … passed
+   to `createDayaClient`/`getDayaClient` are used verbatim.
+2. **Environment variable** — `DAYA_API_KEY`, `DAYA_ENVIRONMENT`, `DAYA_BASE_URL`.
+3. **SDK default** — base URL inferred from the key prefix: `sk_live_…` →
+   production, otherwise sandbox.
+
+| You provide                          | API base URL                        |
+| ------------------------------------ | ----------------------------------- |
+| `sk_sandbox_…` key (no env)          | `https://api.sandbox.daya.co`       |
+| `sk_live_…` key (no env)             | `https://api.daya.co`               |
+| `DAYA_ENVIRONMENT=production`        | `https://api.daya.co`               |
+| `DAYA_ENVIRONMENT=sandbox`           | `https://api.sandbox.daya.co`       |
+| `baseUrl` / `DAYA_BASE_URL`          | your value (overrides all of the above) |
+
+### Explicit configuration
+
+```ts
+import { createDayaClient } from "@okeke-dev/daya-next";
+
+// Per-tenant API key, forcing production.
+const daya = createDayaClient({
+  apiKey: process.env.TENANT_API_KEY,
+  environment: "production",
+});
+
+// Proxied/gateway base URL override.
+const daya = createDayaClient({ baseUrl: "https://gateway.example.com/daya" });
+```
+
+Explicit values take precedence over the environment and are useful for tests,
+multi-tenant systems, and proxies.
 
 ---
 
@@ -140,19 +207,18 @@ the environment at call time.
 
 ### `@okeke-dev/daya-next`
 
-Types only (plus constants and type-only SDK re-exports). Safe to import from
-anywhere, including client components — nothing sensitive is evaluated.
-
-- `types.ts` types: `DayaNextClientOptions`, `DayaWebhookHandler`,
-  `DayaWebhookRouteOptions`
+- `createDayaClient(options)` → `Daya` (server-only)
+- `getDayaClient(options)` → `Promise<Daya>` (server-only)
+- `DayaNextConfigError`
 - `env.ts` constants: `DAYA_ENV_VARS`, `DAYA_SIGNATURE_HEADER`
+- `DayaNextClientOptions`, `DayaWebhookHandler`, `DayaWebhookRouteOptions`
 - SDK types re-exported (`Daya`, `DayaClientConfig`, error classes,
-  `WebhookEvent`, `DayaEventName`, …)
+  `WebhookEvent`, `DayaEventName`, …) — importing these type-only re-exports is
+  safe anywhere, but the runtime entry is intentionally server-only.
 
 ### `@okeke-dev/daya-next/server`
 
-- `createDayaClient(options)` → `Daya`
-- `getDayaClient(options)` → `Promise<Daya>`
+Everything from the root entry, plus:
 - `createDayaWebhookRoute(options)` → `{ POST }`
 - `verifyDayaWebhook(request, options)` → `{ event, rawBody }`
 - `dayaErrorToResponse(error)` → `Response`
@@ -179,8 +245,9 @@ anywhere, including client components — nothing sensitive is evaluated.
   into bundles.
 - Webhook signatures are verified over the **exact raw body** using the SDK's
   timing-safe comparison — never re-serialize a parsed body.
-- No client-side package surface exposes secrets; the root entry contains types
-  and constants only.
+- The runtime entry is guarded by `server-only`: importing it from a Client
+  Component fails the build instead of exposing secret-reading code, and the
+  guard survives bundling (no `sideEffects: false`).
 
 See [SECURITY.md](./SECURITY.md) for details and responsible-disclosure contact.
 

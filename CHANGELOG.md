@@ -13,7 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ESM/CJS output, source maps, declaration files).
 - `createDayaClient(options)` / `getDayaClient(options)` — Daya client factory
   with call-time environment resolution (`DAYA_API_KEY`, `DAYA_ENVIRONMENT`,
-  `DAYA_BASE_URL`).
+  `DAYA_BASE_URL`), sandbox/production inference from the API key prefix, and
+  explicit-config precedence. Exported from the package root (server-only
+  guarded) and the `/server` entry.
 - `createDayaWebhookRoute(options)` — App Router webhook Route Handler factory
   with signature verification, typed handler dispatch, idempotency hooks
   (`isProcessed` / `markProcessed`), and `onEvent` observer.
