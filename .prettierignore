@@ -1,0 +1,10 @@
+node_modules/
+dist/
+coverage/
+.github/
+.next/
+examples/*/node_modules/
+examples/*/.next/
+examples/*/package-lock.json
+*.tgz
+openapi/

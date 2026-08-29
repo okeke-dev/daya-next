@@ -1,0 +1,110 @@
+{
+  "name": "@okeke-dev/daya-next",
+  "version": "0.1.0",
+  "description": "Unofficial community-maintained Next.js App Router integration layer for the Daya Business API (built on @okeke-dev/daya-sdk).",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./server": {
+      "import": {
+        "types": "./dist/server.d.ts",
+        "default": "./dist/server.js"
+      },
+      "require": {
+        "types": "./dist/server.d.cts",
+        "default": "./dist/server.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18.18.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "keywords": [
+    "daya",
+    "daya-api",
+    "next.js",
+    "nextjs",
+    "app-router",
+    "route-handlers",
+    "server-actions",
+    "webhooks",
+    "stablecoin",
+    "ngn",
+    "payments",
+    "sdk",
+    "typescript",
+    "integration"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/okeke-dev/daya-next.git"
+  },
+  "bugs": {
+    "url": "https://github.com/okeke-dev/daya-next/issues"
+  },
+  "homepage": "https://github.com/okeke-dev/daya-next#readme",
+  "author": {
+    "name": "Okeke Chimezie Glory",
+    "email": "okekechimezieglory@gmail.com"
+  },
+  "dependencies": {
+    "@okeke-dev/daya-sdk": "^0.1.0",
+    "server-only": "^0.0.1"
+  },
+  "peerDependencies": {
+    "next": "^15.0.0 || ^16.0.0"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "^0.17.0",
+    "@eslint/js": "^9.10.0",
+    "@types/node": "^22.0.0",
+    "@vitest/coverage-v8": "^3.0.0",
+    "eslint": "^9.12.0",
+    "prettier": "^3.3.0",
+    "publint": "^0.3.0",
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.0",
+    "typescript-eslint": "^8.8.0",
+    "vitest": "^3.0.0"
+  },
+  "scripts": {
+    "build": "tsup",
+    "prepack": "npm run build",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src tests",
+    "lint:fix": "eslint src tests --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:integration": "vitest run tests/integration",
+    "check:exports": "publint && attw --pack",
+    "ci": "npm run typecheck && npm run lint && npm run format:check && npm run test && npm run build && npm run check:exports"
+  }
+}
