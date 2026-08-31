@@ -19,3 +19,5 @@ export type {
 } from "./route-handler/index.js";
 
 export { createDayaClient, getDayaClient } from "./client/index.js";
+// ---- Request-scoped client caching for React Server Components ----
+export { createDayaCachedClient, getDayaCachedClient } from "./cache/index.js";

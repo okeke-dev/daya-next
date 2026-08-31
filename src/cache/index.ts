@@ -1,0 +1,49 @@
+import "server-only";
+
+import type { Daya } from "@okeke-dev/daya-sdk";
+import { cache } from "next/cache";
+
+import { createDayaClient } from "../client/index.js";
+import type { DayaNextClientOptions } from "../types/config.js";
+
+/**
+ * Request-scoped {@link Daya} client for React Server Components.
+ *
+ * Wraps {@link createDayaClient} in React's `cache()`, so every Server
+ * Component in a single request that calls this helper receives the **same**
+ * client instance — the constructor (and its config resolution) runs exactly
+ * once per request instead of once per component.
+ *
+ * Memoization is keyed on the `options` argument as React `cache` expects:
+ * - no argument (or the same `options` object reference) → one shared client
+ *   per request — the intended usage, e.g. a module-level export:
+ *
+ *   ```ts
+ *   // lib/daya.ts
+ *   import { createDayaCachedClient } from "@okeke-dev/daya-next";
+ *   export const getDaya = createDayaCachedClient;
+ *   ```
+ *
+ * - a brand-new `options` object on every call → a fresh client each time
+ *   (React keyes object arguments by reference).
+ *
+ * The cache is scoped to the current request. **Do not** use this helper in
+ * Node-runtime Route Handlers or Middleware: outside a React request scope the
+ * memoization falls back to a process-global store and would share one client
+ * (and config) across every request.
+ *
+ * This entry is server-only, like {@link createDayaClient}.
+ */
+export function createDayaCachedClient(options?: DayaNextClientOptions): Daya {
+  return cachedCreate(options);
+}
+
+/**
+ * Async convenience mirror of {@link createDayaCachedClient}, sharing the same
+ * request-scoped cache key as the synchronous form.
+ */
+export async function getDayaCachedClient(options?: DayaNextClientOptions): Promise<Daya> {
+  return cachedCreate(options);
+}
+
+const cachedCreate = cache(createDayaClient);

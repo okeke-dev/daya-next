@@ -1,6 +1,7 @@
 import "server-only";
 
 export { createDayaClient, getDayaClient } from "../client/index.js";
+export { createDayaCachedClient, getDayaCachedClient } from "../cache/index.js";
 export { createDayaRouteHandler, dayaApiErrorToResponse } from "../route-handler/index.js";
 export type {
   DayaErrorResponseBody,

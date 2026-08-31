@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `DAYA_BASE_URL`), sandbox/production inference from the API key prefix, and
   explicit-config precedence. Exported from the package root (server-only
   guarded) and the `/server` entry.
+- `createDayaCachedClient(options)` / `getDayaCachedClient(options)` —
+  request-scoped client caching for React Server Components via `next/cache`
+  (`react` remains a non-dependency): one shared client per request, keyed on
+  the `options` argument.
 - `createDayaWebhookRoute(options)` — App Router webhook Route Handler factory
   with signature verification, typed handler dispatch, idempotency hooks
   (`isProcessed` / `markProcessed`), and `onEvent` observer.
@@ -30,8 +34,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `dayaErrorToResponse(error)` — webhook error → HTTP response mapping.
 - `DayaNextConfigError` — configuration error thrown at client construction.
 - Server-only guard (`server-only` dependency) on all secret-touching modules.
-- Root entry `@okeke-dev/daya-next` exposing types and constants only (safe for
-  client bundle imports).
+- Root entry `@okeke-dev/daya-next` exposing public types plus the client,
+  caching, and route-handler helpers — server-only guarded, so importing the
+  runtime entry from a Client Component fails at build time (intended).
 - Unit and integration test suites (Vitest, v8 coverage).
 - Example Next.js App Router app under `examples/with-app-router`.
 - GitHub Actions CI (quality, package, example-build jobs).

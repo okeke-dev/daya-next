@@ -21,8 +21,9 @@ resolution, Node.js runtime support, and no client-side bundle.
 - **Typed webhook Route Handlers** — one factory that verifies the
   `x-daya-signature` HMAC (using the SDK's timing-safe verification), parses the
   event, dispatches to typed handlers, and supports idempotent processing.
-- **React-free** — `@okeke-dev/daya-next` does **not** depend on `react` or
-  `react-dom` at runtime; you choose how to memo `getDayaClient`.
+- **Request-scoped caching built in** — `createDayaCachedClient`/`getDayaCachedClient`
+  deduplicate one client per request via `next/cache`, with no `react`/
+  `react-dom` dependency (the package's only peer is `next`).
 - **Route Handler factory** — `createDayaRouteHandler` wires the client, maps
   SDK errors to correct HTTP statuses, preserves Daya request IDs, and
   sanitizes unexpected failures.
@@ -63,9 +64,9 @@ DAYA_WEBHOOK_SECRET=whsec_xxxx
 
 ```ts
 // lib/daya.ts
-import { getDayaClient } from "@okeke-dev/daya-next";
+import { createDayaCachedClient } from "@okeke-dev/daya-next";
 
-export const getClient = getDayaClient;
+export const getClient = createDayaCachedClient;
 ```
 
 ```tsx
@@ -89,12 +90,12 @@ export default async function Page() {
 }
 ```
 
-> **Reuse note:** `getDayaClient` creates a fresh client per call; the `Daya`
-> constructor does no network I/O, so this is cheap. For request-scoped reuse,
-> wrap it in React [`cache()`](https://nextjs.org/docs/app/api-reference/functions/cache)
-> — the package deliberately avoids React imports so the choice is yours, and it
-> never memoizes **module-wide** (that would share one API key across every
-> request).
+> **Reuse note:** `createDayaCachedClient` shares one client per request across
+> every Server Component in the same render. `getDayaClient` is the
+> memoization-free variant (a fresh client per call — the `Daya` constructor
+> does no network I/O, so this is cheap) and is right for Route Handlers and
+> per-tenant keys. The package never memoizes **module-wide** — that would share
+> one API key across every request.
 
 ### 3. Handle webhooks
 
@@ -204,6 +205,34 @@ const daya = createDayaClient({ baseUrl: "https://gateway.example.com/daya" });
 Explicit values take precedence over the environment and are useful for tests,
 multi-tenant systems, and proxies.
 
+### Request-scoped caching (Server Components)
+
+```ts
+// lib/daya.ts
+import { createDayaCachedClient } from "@okeke-dev/daya-next";
+
+// One client per request: every Server Component that calls getClient() in the
+// same render shares the same instance, so the client constructor and config
+// resolution run once per request instead of once per component.
+export const getClient = createDayaCachedClient;
+```
+
+`createDayaCachedClient` / `getDayaCachedClient` wrap the client factory in
+[`next/cache`](https://nextjs.org/docs/app/api-reference/functions/cache)
+(React's `cache`, re-exported by Next — the package still has no `react`
+dependency). The two forms share one cache key, so mixing synchronous and
+`await`-ed calls deduplicates too. Memoization keys on the `options` argument:
+
+- **no argument, or the same object reference** → one shared client per request.
+- **a brand-new `options` object** → a fresh client — the right shape for
+  per-tenant API keys.
+
+> **Do not** use the cached helper in Node-runtime Route Handlers or Middleware.
+> Outside a React request scope the memoization falls back to a process-global
+> store, which would share one client — and one API key — across every request.
+> The route factory (`createDayaRouteHandler`) already builds exactly one
+> client per request on its own.
+
 ---
 
 ## Route Handlers & responses
@@ -279,6 +308,8 @@ runtimes. Webhook verification (`/server`: `createDayaWebhookRoute`,
 
 - `createDayaClient(options)` → `Daya` (server-only)
 - `getDayaClient(options)` → `Promise<Daya>` (server-only)
+- `createDayaCachedClient(options)` → `Daya` (server-only, request-scoped)
+- `getDayaCachedClient(options)` → `Promise<Daya>` (server-only, request-scoped)
 - `createDayaRouteHandler(handler, options)` → Route Handler (server-only, Edge-safe)
 - `dayaApiErrorToResponse(error)` → `Response` (server-only, Edge-safe)
 - `DayaNextConfigError`
