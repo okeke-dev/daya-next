@@ -302,6 +302,97 @@ runtimes. Webhook verification (`/server`: `createDayaWebhookRoute`,
 
 ---
 
+## Webhooks
+
+`createDayaWebhookRoute` turns the SDK's `constructEvent` into an App Router
+Route Handler. Every webhook flows through the same pipeline — signature
+verification always happens **before** any JSON parsing:
+
+```text
+POST /api/webhooks/daya
+  → request.text()              # raw body, read exactly once, nothing parsed
+  → x-daya-signature header     # DAYA_SIGNATURE_HEADER
+  → constructEvent(raw, sig, secret)   # SDK: verify → parse → validate
+  → WebhookEvent (typed discriminated union)
+  → dispatch(handlers) / onEvent / markProcessed
+  → JSON Response
+```
+
+```ts
+// app/api/webhooks/daya/route.ts
+import { createWebhookHandler } from "@okeke-dev/daya-sdk";
+import { createDayaWebhookRoute } from "@okeke-dev/daya-next/server";
+
+export const runtime = "nodejs";
+
+export const { POST } = createDayaWebhookRoute({
+  handlers: [
+    createWebhookHandler("transfer.completed", async (event) => {
+      await creditMatchedTransfer(event.data); // event.data is typed Transfer
+    }),
+  ],
+  // Optional — exactly-once processing across retries:
+  isProcessed: (eventId) => ledger.webhookEvents.has(eventId),
+  markProcessed: (eventId) => ledger.webhookEvents.add(eventId),
+});
+```
+
+`handlers` are SDK-created with `createWebhookHandler(eventName, cb)`, which
+narrows `event.data` per event. **Every matching handler runs in order**; an
+`onEvent` observer (catch-all) runs after them.
+
+### Raw-body preservation (why `request.text()`)
+
+The signature is an HMAC over the **exact bytes** that arrived — whitespace and
+key ordering are part of the signed payload. The adapter therefore never
+parses before verifying:
+
+- `request.text()` reads the body once and returns the exact raw UTF-8 string,
+  which is passed **verbatim** to `constructEvent`. No serializer touches it.
+- **Never** `request.json()` (or `body.json()`) before verification, and never
+  re-stringify a parsed object: `JSON.stringify` reorders keys and normalizes
+  whitespace, which breaks the signature.
+- `request.body` is a `ReadableStream` — you'd have to buffer _and_ decode it
+  yourself, for zero benefit. `request.arrayBuffer()` yields the same bytes, but
+  `text()` already gives the SDK the exact string it verifies, so it's the
+  minimal single read.
+- `NextRequest extends Request`, so the factory's `POST(request: Request)` also
+  accepts `NextRequest` unchanged — only `headers` and `text()` are touched.
+
+### Responses
+
+| Situation                  | Status | Body                                            |
+| -------------------------- | ------ | ----------------------------------------------- |
+| Verified & handled         | 200    | `{ "status": "ok" }`                            |
+| Duplicate (`isProcessed`)  | 200    | `{ "status": "ok", "duplicate": true }`         |
+| Bad/missing signature      | 401    | `{ code, message, reason }`                     |
+| Unparseable/malformed body | 400    | `{ code, message, reason }`                     |
+| Handler threw              | 500    | `{ error, code: "INTERNAL_ERROR" }` (sanitized) |
+
+`reason` is a `DayaWebhookError` classification (`invalid_signature`,
+`malformed_header`, `invalid_json`, `missing_required_fields`, `empty_body`).
+Responses never echo the raw body or the secret, and the adapter **never
+logs** — failures are surfaced only in the JSON body.
+
+### Exactly-once guidance
+
+Daya retries webhooks on non-2xx, so your webhook should be **idempotent**.
+The factory won't auto-deduplicate — that decision belongs to your storage.
+Provide `isProcessed(event.id)` returning `true` for already-handled events and
+`markProcessed(event.id)` persisting the id **only after** handling succeeds;
+repeat deliveries then short-circuit to `200 { status: "ok", duplicate: true }`.
+Event IDs (`evt_...`) are the natural dedup key.
+
+### Lower-level helpers
+
+- `verifyDayaWebhook(request, { secret?, signatureHeader? })` →
+  `{ event, rawBody }` — verify + parse only, useful when you must handle the
+  request yourself. Node runtime only.
+- `dayaErrorToResponse(error)` → the `Response` mapping above, for custom
+  loops. Never logs.
+
+---
+
 ## API surface
 
 ### `@okeke-dev/daya-next`

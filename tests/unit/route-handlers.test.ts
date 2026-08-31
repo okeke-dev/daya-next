@@ -88,6 +88,25 @@ describe("createDayaWebhookRoute", () => {
     expect(body.code).toBe("WEBHOOK_VERIFICATION_FAILED");
   });
 
+  it("returns 401 when the signature header is missing", async () => {
+    const { POST } = createDayaWebhookRoute({
+      secret: SECRET,
+      handlers: [],
+    });
+
+    const request = new Request("https://example.com/api/webhooks/daya", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(makeWebhookPayload()),
+    });
+    const response = await POST(request);
+
+    expect(response.status).toBe(401);
+    const body = await readBody(response);
+    expect(body.code).toBe("WEBHOOK_VERIFICATION_FAILED");
+    expect(body.reason).toBe("malformed_header");
+  });
+
   it("returns 400 when the signed body is not valid JSON", async () => {
     const { POST } = createDayaWebhookRoute({
       secret: SECRET,
@@ -115,6 +134,24 @@ describe("createDayaWebhookRoute", () => {
     expect(response.status).toBe(500);
     const body = await readBody(response);
     expect(body.code).toBe("INTERNAL_ERROR");
+  });
+
+  it("awaits an asynchronous event handler before responding", async () => {
+    const completed: string[] = [];
+    const { POST } = createDayaWebhookRoute({
+      secret: SECRET,
+      handlers: [
+        createWebhookHandler("deposit.completed", async () => {
+          await new Promise((resolve) => setTimeout(resolve, 5));
+          completed.push("handler-done");
+        }),
+      ],
+    });
+
+    const response = await POST(makeSignedRequest(makeWebhookPayload(), SECRET));
+
+    expect(response.status).toBe(200);
+    expect(completed).toEqual(["handler-done"]);
   });
 
   it("falls back to DAYA_WEBHOOK_SECRET from the environment", async () => {
