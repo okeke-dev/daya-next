@@ -8,4 +8,14 @@
 // Actions. A convenience `/server` subpath re-exports the same facilities
 // alongside webhook helpers.
 export * from "./types/index.js";
+// ---- Route Handler helpers (Edge-safe; see src/route-handler) ----
+export { createDayaRouteHandler, dayaApiErrorToResponse } from "./route-handler/index.js";
+export type {
+  DayaErrorResponseBody,
+  DayaRouteContext,
+  DayaRouteHandler,
+  DayaRouteHandlerOptions,
+  DayaRouteParams,
+} from "./route-handler/index.js";
+
 export { createDayaClient, getDayaClient } from "./client/index.js";

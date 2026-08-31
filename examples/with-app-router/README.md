@@ -15,8 +15,10 @@ npm run dev
 Open http://localhost:3000 — the index page calls the Daya rates endpoint and
 renders the rate. Without `DAYA_API_KEY`, it renders a friendly config error.
 
-POST to `/api/webhooks/daya` to exercise webhook verification. To test locally,
-sign a body with the SDK's `generateSignature`:
+Test the API route: `POST /api/transfers` calls `daya.transfers.create` via
+`createDayaRouteHandler` (returns `201` with the transfer, or a mapped SDK
+error). Test webhook verification at `POST /api/webhooks/daya`. To sign a
+webhook payload locally, use the SDK's `generateSignature`:
 
 ```ts
 import { generateSignature } from "@okeke-dev/daya-sdk";

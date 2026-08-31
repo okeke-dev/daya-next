@@ -21,6 +21,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`isProcessed` / `markProcessed`), and `onEvent` observer.
 - `verifyDayaWebhook(request, options)` — raw-body webhook verification and
   typed event parsing.
+- `createDayaRouteHandler(handler, options)` — App Router API route factory that
+  wires a `Daya` client into `{ request, params, daya }` contexts and maps SDK
+  errors to HTTP responses. Edge-safe (Web APIs only).
+- `dayaApiErrorToResponse(error)` — SDK error → `Response` mapping: 401/400/429/
+  504/502/upstream status, with `requestId` preserved in the body and
+  `x-request-id` header, and sanitized bodies for unexpected errors.
 - `dayaErrorToResponse(error)` — webhook error → HTTP response mapping.
 - `DayaNextConfigError` — configuration error thrown at client construction.
 - Server-only guard (`server-only` dependency) on all secret-touching modules.

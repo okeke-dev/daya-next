@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Daya } from "@okeke-dev/daya-sdk";
 
@@ -32,7 +32,7 @@ function capturedClient(options: Parameters<typeof createDayaClient>[0]) {
 
 async function lastUrl(fetchMock: ReturnType<typeof vi.fn>) {
   const call = fetchMock.mock.calls[0];
-  expect(call).toBeDefined();
+  if (call === undefined) throw new Error("expected at least one mocked fetch call");
   return String(call[0]);
 }
 

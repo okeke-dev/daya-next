@@ -17,7 +17,7 @@ async function readBody(response: Response): Promise<Record<string, unknown>> {
 
 describe("createDayaWebhookRoute", () => {
   it("dispatches to matching handlers and returns 200", async () => {
-    const handle = vi.fn(async () => {});
+    const handle = vi.fn(async (_event) => {});
     const onEvent = vi.fn(async () => {});
     const markProcessed = vi.fn(async () => {});
     const { POST } = createDayaWebhookRoute({
@@ -32,13 +32,13 @@ describe("createDayaWebhookRoute", () => {
     expect(response.status).toBe(200);
     expect(await readBody(response)).toEqual({ status: "ok" });
     expect(handle).toHaveBeenCalledTimes(1);
-    expect(handle.mock.calls[0]?.[0].event).toBe("deposit.completed");
+    expect(handle.mock.calls[0]?.[0]?.event).toBe("deposit.completed");
     expect(onEvent).toHaveBeenCalledTimes(1);
     expect(markProcessed).toHaveBeenCalledTimes(1);
   });
 
   it("returns 200 when no handler matches the event", async () => {
-    const handle = vi.fn(async () => {});
+    const handle = vi.fn(async (_event) => {});
     const { POST } = createDayaWebhookRoute({
       secret: SECRET,
       handlers: [createWebhookHandler("transfer.completed", handle)],
@@ -51,7 +51,7 @@ describe("createDayaWebhookRoute", () => {
   });
 
   it("skips dispatch for an already-processed event", async () => {
-    const handle = vi.fn(async () => {});
+    const handle = vi.fn(async (_event) => {});
     const markProcessed = vi.fn(async () => {});
     const { POST } = createDayaWebhookRoute({
       secret: SECRET,
@@ -69,7 +69,7 @@ describe("createDayaWebhookRoute", () => {
   });
 
   it("returns 401 for an invalid signature", async () => {
-    const handle = vi.fn(async () => {});
+    const handle = vi.fn(async (_event) => {});
     const { POST } = createDayaWebhookRoute({
       secret: SECRET,
       handlers: [createWebhookHandler("deposit.completed", handle)],
@@ -118,7 +118,7 @@ describe("createDayaWebhookRoute", () => {
   });
 
   it("falls back to DAYA_WEBHOOK_SECRET from the environment", async () => {
-    const handle = vi.fn(async () => {});
+    const handle = vi.fn(async (_event) => {});
     const { POST } = createDayaWebhookRoute({
       handlers: [createWebhookHandler("deposit.completed", handle)],
     });

@@ -16,7 +16,10 @@ export type DayaNextClientOptions = Partial<DayaClientConfig>;
  */
 export interface DayaWebhookHandler<TEvent extends DayaEventName = DayaEventName> {
   readonly eventName: TEvent;
-  readonly handle: (event: WebhookEvent & { event: TEvent }) => void | Promise<void>;
+  // Declared as a method (not an arrow property) so that SDK handlers — whose
+  // `handle` accepts the *narrowed* per-event type via method bivariance — are
+  // structurally assignable to this interface.
+  handle(event: WebhookEvent & { event: TEvent }): void | Promise<void>;
 }
 
 /** Options for `createDayaWebhookRoute`. */

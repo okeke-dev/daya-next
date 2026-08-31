@@ -3,7 +3,7 @@ import "server-only";
 import { DayaWebhookError } from "@okeke-dev/daya-sdk";
 import type { WebhookEvent } from "@okeke-dev/daya-sdk";
 
-import type { DayaWebhookRouteOptions } from "../types/config.js";
+import type { DayaWebhookHandler, DayaWebhookRouteOptions } from "../types/config.js";
 import { verifyDayaWebhook } from "../webhooks/index.js";
 
 /**
@@ -54,9 +54,13 @@ export function createDayaWebhookRoute(options: DayaWebhookRouteOptions): {
       return Response.json({ status: "ok", duplicate: true });
     }
 
-    await dispatch(handlers, event);
-    if (onEvent) await onEvent(event);
-    if (markProcessed) await markProcessed(event.id);
+    try {
+      await dispatch(handlers, event);
+      if (onEvent) await onEvent(event);
+      if (markProcessed) await markProcessed(event.id);
+    } catch (error) {
+      return dayaErrorToResponse(error);
+    }
 
     return Response.json({ status: "ok" });
   }
@@ -65,7 +69,7 @@ export function createDayaWebhookRoute(options: DayaWebhookRouteOptions): {
 }
 
 async function dispatch(
-  handlers: readonly DayaWebhookRouteOptions["handlers"],
+  handlers: readonly DayaWebhookHandler[],
   event: WebhookEvent,
 ): Promise<void> {
   for (const handler of handlers) {

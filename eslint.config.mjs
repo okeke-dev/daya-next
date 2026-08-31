@@ -16,6 +16,12 @@ export default tseslint.config(
     },
   },
   {
+    files: ["tests/fixtures/**/*.mjs"],
+    languageOptions: {
+      globals: { console: "readonly", process: "readonly" },
+    },
+  },
+  {
     ignores: ["dist/", "node_modules/", "coverage/", "*.config.*"],
   },
 );

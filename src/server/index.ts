@@ -1,6 +1,14 @@
 import "server-only";
 
 export { createDayaClient, getDayaClient } from "../client/index.js";
+export { createDayaRouteHandler, dayaApiErrorToResponse } from "../route-handler/index.js";
+export type {
+  DayaErrorResponseBody,
+  DayaRouteContext,
+  DayaRouteHandler,
+  DayaRouteHandlerOptions,
+  DayaRouteParams,
+} from "../route-handler/index.js";
 export { createDayaWebhookRoute, dayaErrorToResponse } from "../route-handlers/index.js";
 export { verifyDayaWebhook } from "../webhooks/index.js";
 export type { VerifyDayaWebhookOptions, VerifiedDayaWebhook } from "../webhooks/index.js";

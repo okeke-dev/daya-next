@@ -23,9 +23,12 @@ resolution, Node.js runtime support, and no client-side bundle.
   event, dispatches to typed handlers, and supports idempotent processing.
 - **React-free** — `@okeke-dev/daya-next` does **not** depend on `react` or
   `react-dom` at runtime; you choose how to memo `getDayaClient`.
-- **Node.js runtime** — works with Route Handlers, Server Components, and Server
-  Actions. Next.js Edge Runtime is **not** supported (webhook verification
-  requires `node:crypto`).
+- **Route Handler factory** — `createDayaRouteHandler` wires the client, maps
+  SDK errors to correct HTTP statuses, preserves Daya request IDs, and
+  sanitizes unexpected failures.
+- **Node.js + Edge runtimes** — the client and route helper are Edge-safe
+  (Web APIs only); webhook verification requires the Node.js runtime
+  (`node:crypto`).
 
 ---
 
@@ -138,13 +141,13 @@ const customer = await daya.customers.get("cus_...");
 
 ### Where you can (and cannot) import it
 
-| Context                        | Allowed?                                         |
-| ------------------------------ | ------------------------------------------------ |
-| Server Components              | ✅                                                |
-| Route Handlers                 | ✅ (`export const runtime = "nodejs"`)           |
-| Server Actions                 | ✅                                                |
-| Server-only library code       | ✅                                                |
-| Client Components / browser    | ❌ fails the build (see below)                    |
+| Context                     | Allowed?                               |
+| --------------------------- | -------------------------------------- |
+| Server Components           | ✅                                     |
+| Route Handlers              | ✅ (`export const runtime = "nodejs"`) |
+| Server Actions              | ✅                                     |
+| Server-only library code    | ✅                                     |
+| Client Components / browser | ❌ fails the build (see below)         |
 
 Both `@okeke-dev/daya-next` and `@okeke-dev/daya-next/server` expose the helper.
 The package root is the primary entry; the `/server` subpath additionally
@@ -175,13 +178,13 @@ client bundle.
 3. **SDK default** — base URL inferred from the key prefix: `sk_live_…` →
    production, otherwise sandbox.
 
-| You provide                          | API base URL                        |
-| ------------------------------------ | ----------------------------------- |
-| `sk_sandbox_…` key (no env)          | `https://api.sandbox.daya.co`       |
-| `sk_live_…` key (no env)             | `https://api.daya.co`               |
-| `DAYA_ENVIRONMENT=production`        | `https://api.daya.co`               |
-| `DAYA_ENVIRONMENT=sandbox`           | `https://api.sandbox.daya.co`       |
-| `baseUrl` / `DAYA_BASE_URL`          | your value (overrides all of the above) |
+| You provide                   | API base URL                            |
+| ----------------------------- | --------------------------------------- |
+| `sk_sandbox_…` key (no env)   | `https://api.sandbox.daya.co`           |
+| `sk_live_…` key (no env)      | `https://api.daya.co`                   |
+| `DAYA_ENVIRONMENT=production` | `https://api.daya.co`                   |
+| `DAYA_ENVIRONMENT=sandbox`    | `https://api.sandbox.daya.co`           |
+| `baseUrl` / `DAYA_BASE_URL`   | your value (overrides all of the above) |
 
 ### Explicit configuration
 
@@ -203,12 +206,81 @@ multi-tenant systems, and proxies.
 
 ---
 
+## Route Handlers & responses
+
+For API endpoints that talk to Daya, `createDayaRouteHandler` removes the
+boilerplate every handler would otherwise repeat — build the client, map SDK
+errors to HTTP responses, and sanitize anything unexpected:
+
+```ts
+// app/api/transfers/route.ts
+import { createDayaRouteHandler } from "@okeke-dev/daya-next";
+import { DayaValidationError } from "@okeke-dev/daya-sdk";
+
+export const POST = createDayaRouteHandler(async ({ request, daya }) => {
+  const body = (await request.json()) as { amount: string; currency: string; reference: string };
+
+  if (!body.amount) {
+    throw new DayaValidationError("amount is required");
+  }
+
+  const { transfer } = await daya.transfers.create(body);
+  return Response.json(transfer, { status: 201 }); // explicit status, plain Response
+});
+```
+
+It runs your handler with `{ request, params, daya }`, returns the `Response`
+you produce on success, and on failure builds one for you:
+
+| Error                     | Status | Notes                                   |
+| ------------------------- | ------ | --------------------------------------- |
+| `DayaAuthenticationError` | 401    | `code`, `requestId`                     |
+| `DayaValidationError`     | 400    | plus `details`, `validation`            |
+| `DayaRateLimitError`      | 429    | `code`, `requestId`                     |
+| `DayaTimeoutError`        | 504    |                                         |
+| `DayaNetworkError`        | 502    |                                         |
+| other `DayaApiError`      | API's  | preserves the upstream status code      |
+| anything else             | 500    | sanitized — no stack, no internal leaks |
+
+`Daya` errors keep the SDK's `code` and message, and — when the API provided
+one — the **request ID**, echoed back in the JSON body and the `x-request-id`
+response header so failures can be traced end to end. Unexpected errors never
+leak stack traces or internal messages. `params` is the raw second Route
+Handler argument; in Next.js 15+ it is a `Promise`, so `await params` as needed.
+
+Pass explicit client options or a prebuilt client for per-tenant or test setups:
+
+```ts
+export const POST = createDayaRouteHandler(handler, {
+  client: { apiKey: process.env.TENANT_API_KEY }, // or a Daya instance
+});
+```
+
+### `Response` vs `NextResponse`
+
+Use the standard Web `Response` API (`Response.json`). For a pure JSON
+endpoint `NextResponse` is identical on the wire and adds nothing — its value is
+redirects, rewrites, cookie helpers, and middleware. Reach for `NextResponse`
+only if a route is also redirecting or setting cookies.
+
+### Node.js vs Edge runtime
+
+`createDayaClient` and `createDayaRouteHandler` use only Web APIs (fetch,
+`Response`, `AbortController`) — they run on **both** Node.js and Edge
+runtimes. Webhook verification (`/server`: `createDayaWebhookRoute`,
+`verifyDayaWebhook`) uses `node:crypto`, so **webhook routes must declare
+`export const runtime = "nodejs"`**. Either way, API keys stay server-side.
+
+---
+
 ## API surface
 
 ### `@okeke-dev/daya-next`
 
 - `createDayaClient(options)` → `Daya` (server-only)
 - `getDayaClient(options)` → `Promise<Daya>` (server-only)
+- `createDayaRouteHandler(handler, options)` → Route Handler (server-only, Edge-safe)
+- `dayaApiErrorToResponse(error)` → `Response` (server-only, Edge-safe)
 - `DayaNextConfigError`
 - `env.ts` constants: `DAYA_ENV_VARS`, `DAYA_SIGNATURE_HEADER`
 - `DayaNextClientOptions`, `DayaWebhookHandler`, `DayaWebhookRouteOptions`
@@ -219,6 +291,7 @@ multi-tenant systems, and proxies.
 ### `@okeke-dev/daya-next/server`
 
 Everything from the root entry, plus:
+
 - `createDayaWebhookRoute(options)` → `{ POST }`
 - `verifyDayaWebhook(request, options)` → `{ event, rawBody }`
 - `dayaErrorToResponse(error)` → `Response`
@@ -248,6 +321,8 @@ Everything from the root entry, plus:
 - The runtime entry is guarded by `server-only`: importing it from a Client
   Component fails the build instead of exposing secret-reading code, and the
   guard survives bundling (no `sideEffects: false`).
+- `dayaApiErrorToResponse` returns sanitized error bodies — no stack traces, no
+  internal messages, no secrets; Daya request IDs are preserved for tracing.
 
 See [SECURITY.md](./SECURITY.md) for details and responsible-disclosure contact.
 
