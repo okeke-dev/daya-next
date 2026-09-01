@@ -27,7 +27,7 @@ export default async function HomePage() {
     <main>
       <h1>NGN/USDC rate</h1>
       <p>
-        {rate.currency} → {rate.quote_currency}: {rate.value}
+        {rate.base_currency} → {rate.quote_currency}: {rate.value}
       </p>
       <p>
         Webhook endpoint: <code>POST /api/webhooks/daya</code>

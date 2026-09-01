@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { Daya } from "@okeke-dev/daya-sdk";
-import { cache } from "next/cache";
+import { cache } from "react";
 
 import { createDayaClient } from "../client/index.js";
 import type { DayaNextClientOptions } from "../types/config.js";
@@ -28,11 +28,15 @@ import type { DayaNextClientOptions } from "../types/config.js";
  *   (React keyes object arguments by reference).
  *
  * The cache is scoped to the current request. **Do not** use this helper in
- * Node-runtime Route Handlers or Middleware: outside a React request scope the
- * memoization falls back to a process-global store and would share one client
- * (and config) across every request.
+ * Node-runtime Route Handlers or Middleware: outside a React Server Component
+ * render there is no memoization store, so `cache()` re-runs the factory on
+ * every call (and a long-lived process could still share one client across
+ * requests). Only call it from Server Components rendered by the App Router.
  *
- * This entry is server-only, like {@link createDayaClient}.
+ * `cache` is imported from `react` (the officially documented RSC
+ * memoization primitive) — the `next/cache` module never exported `cache`.
+ * `react` is therefore a peer dependency, like `next`. This entry is
+ * server-only, like {@link createDayaClient}.
  */
 export function createDayaCachedClient(options?: DayaNextClientOptions): Daya {
   return cachedCreate(options);

@@ -218,20 +218,22 @@ export const getClient = createDayaCachedClient;
 ```
 
 `createDayaCachedClient` / `getDayaCachedClient` wrap the client factory in
-[`next/cache`](https://nextjs.org/docs/app/api-reference/functions/cache)
-(React's `cache`, re-exported by Next — the package still has no `react`
-dependency). The two forms share one cache key, so mixing synchronous and
-`await`-ed calls deduplicates too. Memoization keys on the `options` argument:
+React's `cache()` — the officially documented RSC memoization primitive, so
+`react` (like `next`) is a peer dependency. The two forms share one cache key,
+so mixing synchronous and `await`-ed calls deduplicates too. Memoization keys on
+the `options` argument:
 
 - **no argument, or the same object reference** → one shared client per request.
 - **a brand-new `options` object** → a fresh client — the right shape for
   per-tenant API keys.
 
 > **Do not** use the cached helper in Node-runtime Route Handlers or Middleware.
-> Outside a React request scope the memoization falls back to a process-global
-> store, which would share one client — and one API key — across every request.
-> The route factory (`createDayaRouteHandler`) already builds exactly one
-> client per request on its own.
+> React's `cache` memoizes only inside a Next.js App Router Server Component
+> render, where Next enables the request-memoization store. Outside that render
+> the wrapped factory simply re-runs every call — so a long-lived process would
+> construct a client (and resolve config) per call instead of sharing. Call it
+> from Server Components only; the route factory (`createDayaRouteHandler`)
+> already builds exactly one client per request on its own.
 
 ---
 

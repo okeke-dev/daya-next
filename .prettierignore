@@ -6,5 +6,6 @@ coverage/
 examples/*/node_modules/
 examples/*/.next/
 examples/*/package-lock.json
+examples/*/next-env.d.ts
 *.tgz
 openapi/

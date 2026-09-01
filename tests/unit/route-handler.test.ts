@@ -23,7 +23,12 @@ async function invoke(
     handler,
     options as Parameters<typeof createDayaRouteHandler>[1],
   );
-  return route(new Request(ROUTE_URL, { method: "POST", body: "{}" }), context ?? { params: {} });
+  // Next.js 15.5 passes route params as a Promise (async params); so does this
+  // test invocation.
+  const resolvedContext: { params: Promise<Record<string, string>> } = {
+    params: Promise.resolve(context?.params ?? {}),
+  };
+  return route(new Request(ROUTE_URL, { method: "POST", body: "{}" }), resolvedContext);
 }
 
 async function body(response: Response): Promise<Record<string, unknown>> {

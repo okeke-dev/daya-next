@@ -133,7 +133,7 @@ function errorResponse(status: number, error: DayaError): Response {
 export function createDayaRouteHandler<TParams extends DayaRouteParams = DayaRouteParams>(
   handler: DayaRouteHandler<TParams>,
   options: DayaRouteHandlerOptions = {},
-): (request: Request, context?: { params: TParams | Promise<TParams> }) => Promise<Response> {
+): (request: Request, context: { params: Promise<TParams> }) => Promise<Response> {
   return async function route(request, context) {
     let daya: Daya | undefined;
     try {

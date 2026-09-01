@@ -8,6 +8,7 @@ node_modules/
 .next/
 out/
 *.tsbuildinfo
+examples/*/next-env.d.ts
 
 # --- Env (never commit secrets) ---
 .env

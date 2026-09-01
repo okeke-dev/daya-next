@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `createDayaCachedClient` / `getDayaCachedClient` now import React's `cache`
+  from `react` instead of `next/cache`. `next/cache` never exported a `cache`
+  function (it exposes `revalidatePath`, `revalidateTag`, `unstable_cache`,
+  etc.), so the previous import would have thrown `cache is not a function` at
+  runtime inside a Server Component render; it type-checked only via a now-
+  removed ambient shim. `react` is added as a peer dependency (like `next`).
+- `createDayaRouteHandler` returns a Route Handler whose second argument is a
+  required `{ params: Promise<TParams> }` — the signature Next.js 15.5's
+  generated `RouteContext` type-check expects. Previously the param was
+  optional (and `TParams` unmemoized), which failed `next build` type checking
+  in Next 15.5 consumers.
+- `check:exports` now runs attw with `--profile node16` (the package targets
+  Node ≥18.18, so legacy `node10` resolution of the `/server` subpath is out of
+  scope) and pins `fflate` to `0.8.2` via `overrides` to work around
+  [arethetypeswrong/core#258](https://github.com/arethetypeswrong/arethetypeswrong.github.io/issues/258).
+- Example app: fixed `app/page.tsx` to read the SDK's `Rate.base_currency` /
+  `quote_currency` fields (the previous `currency` accessor does not exist).
+
 ### Added
 
 - `@okeke-dev/daya-next` package scaffold (ESM-first, strict TypeScript, dual
@@ -17,9 +37,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   explicit-config precedence. Exported from the package root (server-only
   guarded) and the `/server` entry.
 - `createDayaCachedClient(options)` / `getDayaCachedClient(options)` —
-  request-scoped client caching for React Server Components via `next/cache`
-  (`react` remains a non-dependency): one shared client per request, keyed on
-  the `options` argument.
+  request-scoped client caching for React Server Components via React's `cache`
+  (`react` is a peer dependency, like `next`): one shared client per request,
+  keyed on the `options` argument.
 - `createDayaWebhookRoute(options)` — App Router webhook Route Handler factory
   with signature verification, typed handler dispatch, idempotency hooks
   (`isProcessed` / `markProcessed`), and `onEvent` observer.

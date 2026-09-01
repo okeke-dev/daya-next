@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Daya } from "@okeke-dev/daya-sdk";
 
-import { createDayaCachedClient, getDayaCachedClient } from "../../src/cache/index.js";
+import { createDayaCachedClient } from "../../src/cache/index.js";
 import { createDayaClient } from "../../src/client/index.js";
 
 const ORIGINAL_API_KEY = process.env.DAYA_API_KEY;
@@ -24,33 +24,23 @@ async function lastUrl(fetchMock: ReturnType<typeof vi.fn>) {
   return String(call[0]);
 }
 
+/**
+ * `createDayaCachedClient` wraps the client factory in React's `cache()`, which
+ * memoizes **only inside a Next.js App Router Server Component render** (Next
+ * enables React's request-memoization store there). Outside such a render — a
+ * plain Node/vitest process, or even `react-dom/server` `renderToStaticMarkup` —
+ * React's `cache` silently runs the wrapped function every call. The same-
+ * instance sharing is therefore not asserted here; it is exercised by the
+ * example app under a real Next build (CI `example-build` job). These tests
+ * cover the behaviour that holds regardless of render scope: configuration and
+ * environment resolution at call time, and that the plain (uncached) factory is
+ * intentionally never memoized.
+ */
 describe("createDayaCachedClient", () => {
-  it("shares one instance for repeated no-argument calls", () => {
+  it("returns a Daya client instance", () => {
     process.env.DAYA_API_KEY = "sk_sandbox_test";
-    const first = createDayaCachedClient();
-    const second = createDayaCachedClient();
-    expect(first).toBe(second);
-    expect(first).toBeInstanceOf(Daya);
-  });
-
-  it("shares one instance across the sync and async forms", async () => {
-    process.env.DAYA_API_KEY = "sk_sandbox_test";
-    const sync = createDayaCachedClient();
-    const async = await getDayaCachedClient();
-    expect(async).toBe(sync);
-  });
-
-  it("reuses one instance when the same options object is passed", () => {
-    const options = { apiKey: "sk_sandbox_test" };
-    const first = createDayaCachedClient(options);
-    const second = createDayaCachedClient(options);
-    expect(first).toBe(second);
-  });
-
-  it("builds a fresh instance for a brand-new options object", () => {
-    const first = createDayaCachedClient({ apiKey: "sk_sandbox_test" });
-    const second = createDayaCachedClient({ apiKey: "sk_sandbox_test" });
-    expect(first).not.toBe(second);
+    const daya = createDayaCachedClient();
+    expect(daya).toBeInstanceOf(Daya);
   });
 
   it("resolves explicit configuration through the cache", async () => {

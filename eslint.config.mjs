@@ -16,9 +16,13 @@ export default tseslint.config(
     },
   },
   {
-    files: ["tests/fixtures/**/*.mjs"],
+    files: ["tests/fixtures/**/*.{mjs,cjs}"],
     languageOptions: {
-      globals: { console: "readonly", process: "readonly" },
+      globals: { console: "readonly", process: "readonly", require: "readonly" },
+    },
+    rules: {
+      "@typescript-eslint/no-require-imports": "off",
+      "no-undef": "off",
     },
   },
   {
