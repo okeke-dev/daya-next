@@ -393,6 +393,135 @@ Event IDs (`evt_...`) are the natural dedup key.
 
 ---
 
+## Server Actions & data mutations
+
+The recommended way to mutate Daya resources from a form or `onClick` is a
+Next.js **Server Action** that uses `createDayaClient()` directly. There is no
+dedicated helper in v0.1 — see [Why there is no helper](#why-there-is-no-createDayaaction-helper)
+below.
+
+A Server Action is just an async function that only ever runs server-side, so
+it uses the SDK exactly like a Route Handler:
+
+```ts
+"use server";
+// app/actions/customers.ts
+import { revalidatePath } from "next/cache";
+import { createDayaClient } from "@okeke-dev/daya-next";
+import { DayaNetworkError, DayaValidationError } from "@okeke-dev/daya-sdk";
+
+export type CreateCustomerResult =
+  { ok: true; customerId: string } | { ok: false; error: { code: string; message: string } };
+
+export async function createCustomer(
+  _prevState: CreateCustomerResult | null,
+  formData: FormData,
+): Promise<CreateCustomerResult> {
+  const email = String(formData.get("email") ?? "").trim();
+
+  try {
+    const daya = createDayaClient(); // call-time env — never in the bundle
+    const { customer } = await daya.customers.create({ email });
+    revalidatePath("/dashboard");
+    return { ok: true, customerId: customer.id };
+  } catch (error) {
+    if (error instanceof DayaValidationError) {
+      return {
+        ok: false,
+        error: { code: error.code, message: "That email address is not valid." },
+      };
+    }
+    if (error instanceof DayaNetworkError) {
+      return { ok: false, error: { code: error.code, message: "Please try again." } };
+    }
+    return { ok: false, error: { code: "INTERNAL_ERROR", message: "Something went wrong." } };
+  }
+}
+```
+
+Wire it up from a Client Component with `useActionState`:
+
+```tsx
+"use client";
+// app/dashboard/page.tsx
+import { useActionState } from "react";
+import { createCustomer, type CreateCustomerResult } from "@/app/actions/customers";
+
+function NewCustomerForm() {
+  const [state, formAction, isPending] = useActionState<CreateCustomerResult | null, FormData>(
+    createCustomer,
+    null,
+  );
+  return (
+    <form action={formAction}>
+      <input name="email" type="email" required />
+      <button type="submit" disabled={isPending}>
+        {isPending ? "Creating…" : "Create customer"}
+      </button>
+      {state?.ok && <p>Created customer {state.customerId}.</p>}
+      {state && !state.ok && <p>{state.error.message}</p>}
+    </form>
+  );
+}
+```
+
+The same shape applies to every SDK resource — `daya.fundingAccounts.create`,
+`daya.transfers.initiate`, `daya.rates.get` inside `async function` reads —
+differing only in the args and the `revalidatePath` policy.
+
+### Return structured results, don't throw
+
+Next.js serializes a thrown `Error` to the browser as `{ name, message }`
+**only** — custom properties such as `error.code`, `error.requestId` or
+`error.validation` never cross the RPC boundary. Returning a discriminated
+result (`{ ok: true, data } | { ok: false, error: { code, message } }`) keeps
+the Daya classification available to your form (per-field errors, retry copy,
+i18n). Map SDK errors to **public-facing messages inside the action** — never
+render raw SDK messages as UI copy — and log `error.requestId` server-side for
+support tracing.
+
+### Validation, amounts & idempotency
+
+- Validate server-side (zod or manual checks in the action); client-side checks
+  are UX only. Daya validates too and returns `DayaValidationError`.
+- **Never trust client-submitted amounts.** For transfers, re-derive the amount
+  from your own ledger and pass a unique `reference` (e.g.
+  `${userId}-${Date.now()}`) so a retried action can't double-settle. Confirm
+  settlement via the `transfer.completed` webhook, not the action response.
+- Reads that back an RSC or an action can use `createDayaCachedClient()` for
+  request-scoped memoization (see "Request-scoped caching").
+
+### Security
+
+- `"use server"` files never ship a byte to the browser, and the `server-only`
+  guard inside `createDayaClient` fails the **build** if anything tries to
+  import it from client scope — credentials simply cannot leak.
+- Never use `NEXT_PUBLIC_*` for Daya secrets; actions read them from server env
+  at call time. Keep action args minimal (formData / primitives) and re-derive
+  authoritative state server-side — don't accept a full object from the client.
+- Next.js mutates only via POST and origin-checks actions, so CSRF is handled
+  by the framework.
+
+### Why there is no `createDayaAction` helper
+
+Deliberate non-feature for v0.1. A generic wrapper would save one
+client-construction line and little else: every action still owns validation,
+arg parsing, `revalidatePath`/`redirect` (`next/cache`, `next/navigation`) and
+the per-app error→UI mapping. A fixed return envelope would push those concerns
+_around_ it instead of removing them, add a second pattern competing with
+`createDayaRouteHandler`, and add **zero** security — `"use server"` plus
+`server-only` already guarantee server-only execution and call-time credential
+reads. The genuinely reusable piece — discriminated success/failure results —
+is the ~6-line pattern documented above, not a library API. If real-world usage
+shows that pattern has sharp edges, a typed `createDayaAction` can be
+reconsidered in a later version.
+
+A complete runnable version of this pattern lives in
+[examples/with-app-router](examples/with-app-router) (`app/actions/customers.ts`
+and `app/customers/new/page.tsx`).
+
+---
+
 ## API surface
 
 ### `@okeke-dev/daya-next`

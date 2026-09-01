@@ -41,3 +41,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Example Next.js App Router app under `examples/with-app-router`.
 - GitHub Actions CI (quality, package, example-build jobs).
 - MIT license, contribution, and security docs.
+
+### Documentation
+
+- "Server Actions & data mutations" README section: the recommended Server
+  Action pattern (`createDayaClient()` inside a `"use server"` function),
+  discriminated `{ ok, data | error }` results (composed via `useActionState`),
+  and why a dedicated `createDayaAction` helper is intentionally **not** shipped
+  in v0.1 — it adds no security over the `"use server"` + `server-only`
+  boundary, and error→UI mapping is inherently app-specific.
+- Example app now demonstrates the pattern end-to-end:
+  `examples/with-app-router/actions/customers.ts` (action with public-facing
+  error mapping, `revalidatePath`) and
+  `examples/with-app-router/app/customers/new/page.tsx` (form via
+  `useActionState`).

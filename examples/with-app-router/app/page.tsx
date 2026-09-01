@@ -32,6 +32,9 @@ export default async function HomePage() {
       <p>
         Webhook endpoint: <code>POST /api/webhooks/daya</code>
       </p>
+      <p>
+        <a href="/customers/new">Create a customer (Server Action)</a>
+      </p>
     </main>
   );
 }
