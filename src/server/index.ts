@@ -10,7 +10,7 @@ export type {
   DayaRouteHandlerOptions,
   DayaRouteParams,
 } from "../route-handler/index.js";
-export { createDayaWebhookRoute, dayaErrorToResponse } from "../route-handlers/index.js";
+export { createDayaWebhookRoute, dayaErrorToResponse } from "../webhook-route/index.js";
 export { verifyDayaWebhook } from "../webhooks/index.js";
 export type { VerifyDayaWebhookOptions, VerifiedDayaWebhook } from "../webhooks/index.js";
 export { DayaNextConfigError } from "../internal/errors.js";

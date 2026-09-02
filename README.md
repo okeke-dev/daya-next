@@ -22,8 +22,8 @@ resolution, Node.js runtime support, and no client-side bundle.
   `x-daya-signature` HMAC (using the SDK's timing-safe verification), parses the
   event, dispatches to typed handlers, and supports idempotent processing.
 - **Request-scoped caching built in** — `createDayaCachedClient`/`getDayaCachedClient`
-  deduplicate one client per request via `next/cache`, with no `react`/
-  `react-dom` dependency (the package's only peer is `next`).
+  deduplicate one client per request via React's `cache()` (so `react`, like
+  `next`, is a peer dependency).
 - **Route Handler factory** — `createDayaRouteHandler` wires the client, maps
   SDK errors to correct HTTP statuses, preserves Daya request IDs, and
   sanitizes unexpected failures.
@@ -227,13 +227,14 @@ the `options` argument:
 - **a brand-new `options` object** → a fresh client — the right shape for
   per-tenant API keys.
 
-> **Do not** use the cached helper in Node-runtime Route Handlers or Middleware.
-> React's `cache` memoizes only inside a Next.js App Router Server Component
-> render, where Next enables the request-memoization store. Outside that render
-> the wrapped factory simply re-runs every call — so a long-lived process would
-> construct a client (and resolve config) per call instead of sharing. Call it
-> from Server Components only; the route factory (`createDayaRouteHandler`)
-> already builds exactly one client per request on its own.
+> **Do not** use the cached helper in plain Node-runtime Route Handlers or
+> Middleware. React's `cache` memoizes only where Next.js has the request-scope
+> store enabled — Server Component renders and Server Actions. Outside that
+> scope the wrapped factory simply re-runs every call — so a long-lived process
+> would construct a client (and resolve config) per call instead of sharing.
+> For Node-runtime handlers, use `createDayaClient()` directly; the route
+> factory (`createDayaRouteHandler`) already builds exactly one client per
+> request on its own.
 
 ---
 
@@ -296,11 +297,13 @@ only if a route is also redirecting or setting cookies.
 
 ### Node.js vs Edge runtime
 
-`createDayaClient` and `createDayaRouteHandler` use only Web APIs (fetch,
-`Response`, `AbortController`) — they run on **both** Node.js and Edge
-runtimes. Webhook verification (`/server`: `createDayaWebhookRoute`,
-`verifyDayaWebhook`) uses `node:crypto`, so **webhook routes must declare
-`export const runtime = "nodejs"`**. Either way, API keys stay server-side.
+`createDayaClient` and `createDayaRouteHandler` read secrets from `process.env`
+at call time and otherwise use only Web APIs (fetch, `Response`,
+`AbortController`) — they run on **both** Node.js and Edge runtimes (`process.env`
+is available read-only on Edge). Webhook verification (`/server`:
+`createDayaWebhookRoute`, `verifyDayaWebhook`) uses `node:crypto`, so **webhook
+routes must declare `export const runtime = "nodejs"`**. Either way, API keys
+stay server-side.
 
 ---
 

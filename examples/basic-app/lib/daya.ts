@@ -11,6 +11,8 @@ import { createDayaCachedClient } from "@okeke-dev/daya-next";
 //   - configured from `DAYA_API_KEY` / `DAYA_ENVIRONMENT` / `DAYA_BASE_URL` at
 //     call time (never at module scope).
 //
-// Call it only from Server Components, Server Actions, or Route Handlers. Do
-// not use it in Node-runtime Route Handlers where no RSC render exists.
+// Call it from Server Components or Server Actions (both run inside React's
+// request scope, where `cache()` memoizes). Do not use it in plain Node-runtime
+// Route Handlers or Middleware, where no request-scope store exists — use
+// `createDayaClient()` directly there instead.
 export const getDaya = createDayaCachedClient;

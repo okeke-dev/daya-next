@@ -27,11 +27,13 @@ import type { DayaNextClientOptions } from "../types/config.js";
  * - a brand-new `options` object on every call → a fresh client each time
  *   (React keyes object arguments by reference).
  *
- * The cache is scoped to the current request. **Do not** use this helper in
- * Node-runtime Route Handlers or Middleware: outside a React Server Component
- * render there is no memoization store, so `cache()` re-runs the factory on
- * every call (and a long-lived process could still share one client across
- * requests). Only call it from Server Components rendered by the App Router.
+ * The cache is scoped to the current request. React `cache` memoizes anywhere
+ * Next.js has the request-scope store enabled — Server Component renders and
+ * Server Actions (which run inside that scope). **Do not** use this helper in
+ * plain Node-runtime Route Handlers or Middleware: outside the request scope
+ * there is no memoization store, so `cache()` re-runs the factory on every call
+ * (and a long-lived process could still share one client across requests). For
+ * Node-runtime handlers, use {@link createDayaClient} directly.
  *
  * `cache` is imported from `react` (the officially documented RSC
  * memoization primitive) — the `next/cache` module never exported `cache`.

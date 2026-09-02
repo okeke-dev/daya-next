@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createWebhookHandler } from "@okeke-dev/daya-sdk";
 
-import { createDayaWebhookRoute } from "../../src/route-handlers/index.js";
+import { createDayaWebhookRoute } from "../../src/webhook-route/index.js";
 import {
   makeSignedRequest,
   makeSignedRequestFromRaw,

@@ -21,11 +21,11 @@ Requires Node.js **>= 18.18.0**.
 
 ```
 src/
-  index.ts                 # root entry — types + constants only (client-safe)
+  index.ts                 # root entry — public types + server-only client/cache/route helpers
   server/index.ts          # /server entry — all runtime, secret-touching code
   client/                  # createDayaClient / getDayaClient
   webhooks/                # verifyDayaWebhook
-  route-handlers/          # createDayaWebhookRoute / dayaErrorToResponse
+  webhook-route/           # createDayaWebhookRoute / dayaErrorToResponse
   internal/                # env resolution, custom errors
   types/                   # options types, env constants, SDK type re-exports
 tests/
