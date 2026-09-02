@@ -1,0 +1,59 @@
+name: Publish
+
+# Publishes @okeke-dev/daya-next to the public npm registry via **npm trusted
+# publishing (OIDC)**. No long-lived npm token is used: the workflow mints a
+# short-lived OIDC token (`id-token: write`) that npm exchanges for an
+# ephemeral publish credential, and npm automatically attaches provenance
+# attestations (see npm docs "Trusted publishing" / "Generating provenance").
+#
+# BEFORE this can work you must add a Trusted Publisher on npmjs.com for the
+# package @okeke-dev/daya-next -> Settings -> Trusted publishing:
+#   - Organization or user: okeke-dev
+#   - Repository:           daya-next
+#   - Workflow filename:    publish.yml   (must match this file exactly)
+#   - Allowed actions:      npm publish
+#
+# Requirements: GitHub-hosted runner + Node >= 22.14 (npm >= 11.5.1 OIDC).
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+  id-token: write # required for npm trusted publishing / provenance
+
+jobs:
+  checks:
+    name: Quality gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 23
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run test
+      - run: npm run build
+      - run: npm run check:exports
+
+  publish:
+    name: Publish to npm (trusted publishing, OIDC)
+    needs: checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 23
+          registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false # never cache in release builds
+      - run: npm ci
+      # npm publish uses the ambient OIDC token (id-token: write) for trusted
+      # publishing; publishConfig.provenance=true emits a provenance attestation.
+      - run: npm publish --access public
